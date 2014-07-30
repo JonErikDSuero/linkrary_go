@@ -7,6 +7,7 @@ import (
   "net/http"
   "github.com/gorilla/mux"
   "gopkg.in/mgo.v2"
+  "strings"
   //"gopkg.in/mgo.v2/bson"
 )
 
@@ -35,18 +36,30 @@ func main() {
 
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
-  fmt.Fprintf(w, "Hi there, I love %s!", r.URL.Path[1:])
+  for _, e := range os.Environ() {
+    pair := strings.Split(e, "=")
+    fmt.Println( pair[0] + "=" + pair[1] )
+  }
+  var mongo_url = os.Getenv("MONGO_URL")
+  if (mongo_url == "") {
+    mongo_url = "localhost:27017"
+  }
+  fmt.Printf("mongo_url is [%s]\n", mongo_url)
+  session, err := mgo.Dial(mongo_url)
+  if err != nil {
+    panic(err)
+  }
+  defer session.Close()
 }
 
 
 func CreateLinkHandler(w http.ResponseWriter, r *http.Request) {
   r.ParseForm()
-  fmt.Printf("name: !%s!\n", r.FormValue("name"))
-
-  var mongo_url= os.Getenv("MONGO_URL")
+  var mongo_url = r.FormValue("mongo_url")
   if (mongo_url == "") {
     mongo_url = "localhost:27017"
   }
+  fmt.Printf("mongo_url !%s!\n", mongo_url)
   session, err := mgo.Dial(mongo_url)
   if err != nil {
     panic(err)
@@ -54,18 +67,10 @@ func CreateLinkHandler(w http.ResponseWriter, r *http.Request) {
   defer session.Close()
   // Optional. Switch the session to a monotonic behavior.
   session.SetMode(mgo.Monotonic, true)
-  con := session.DB("test").C("link")
+  con := session.DB("linkrary_go-production").C("link")
   err = con.Insert( &Link{ r.FormValue("name"), r.FormValue("url"), r.FormValue("submitted_by") } )
   if err != nil {
     panic(err)
   }
   fmt.Fprintf(w, "SemiWorking...")
 }
-
-// MONGODB_DATABASE: "linkrary_go-production"
-// MONGODB_HOST:     "172.17.0.129"
-// MONGODB_PORT:     "27017"
-// MONGODB_USERNAME: "linkrary_go"
-// MONGODB_PASSWORD: "QkhxVE5JSzd3SFRMWW9ZTmV1TElocWNjbHlLVGd0SXlhQ0dEQ3ZJMm8zaz0K"
-// MONGO_URL:        "mongodb://linkrary_go:QkhxVE5JSzd3SFRMWW9ZTmV1TElocWNjbHlLVGd0SXlhQ0dEQ3ZJMm8zaz0K@172.17.0.129:27017/linkrary_go-production"
-
