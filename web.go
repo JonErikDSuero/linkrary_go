@@ -10,25 +10,38 @@ import (
   //"strings"
   "gopkg.in/mgo.v2/bson"
   "log"
+  "time"
 )
 
 type (
-  mgoRepo struct {
+  LinkRepo struct {
+    Collection *mgo.Collection
+  }
+
+  FolderRepo struct {
     Collection *mgo.Collection
   }
 
   Links []Link
   Link struct {
-    Id           bson.ObjectId  `json:"id"            bson:"_id"`
-    Name         string         `json:"name"          bson:"name"`
-    Url          string         `json:"url"           bson:"url"`
-    SubmittedBy  string         `json:"submitted_by"  bson:"submitted_by"`
+    Id bson.ObjectId `json:"id" bson:"_id"`
+    Name string `json:"name" bson:"name"`
+    Url string `json:"url" bson:"url"`
+    CreatedAt time.Time `json:"created_at" bson:"created_at"`
+    UpdatedAt time.Time `json:"updated_at" bsom:"created_at"`
+    FolderId bson.ObjectId `json:"folder_id" bson:"folder_id"`
+  }
+
+  Folders []Folder
+  Folder struct {
+    Id bson.ObjectId `json:"id" bson:"_id"`
+    Name string `json:"name" bson:"name"`
+    Tags []string
   }
 )
 
-
-var linkRepo mgoRepo
-
+var linkRepo LinkRepo
+var folderRepo FolderRepo
 
 func main() {
   var mongo_url = os.Getenv("MY_MONGODB_URL")
@@ -40,9 +53,11 @@ func main() {
   defer session.Close()
   session.SetMode(mgo.Monotonic, true)  // Optional. Switch the session to a monotonic behavior.
   linkRepo.Collection = session.DB("linkrary_go-production").C("link")
+  folderRepo.Collection = session.DB("linkrary_go-production").C("folder")
 
   r := mux.NewRouter()
   r.HandleFunc("/", handleHome).Methods("GET")
+  r.HandleFunc("/links", handleLinkAll).Methods("GET")
   r.HandleFunc("/links/create", handleLinkCreate).Methods("POST")
   http.Handle("/", r)
   var port = os.Getenv("PORT")
@@ -60,61 +75,42 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 
 
 func handleLinkCreate(w http.ResponseWriter, r *http.Request) {
-  var (
-    link Link
-    err  error
-  )
+  var link Link
+  var folder_suggested Folder
+  var err  error
   data := struct {
     Success bool `json:"success"`
-    Link    Link `json:"link"`
+    FolderName string `json:"folder_name"`
   }{
     Success: false,
   }
   r.ParseForm()
   link.Name = r.FormValue("name")
   link.Url = r.FormValue("url")
-  link.SubmittedBy = r.FormValue("submitted_by")
+  extra_info := link.Name + " " + r.FormValue("extra_info")
+  folderRepo.SuggestFolder(&folder_suggested, &extra_info)
+  link.FolderId = folder_suggested.Id
   if err = linkRepo.Create(&link); err != nil {
     panic(err)
   } else {
     data.Success = true
-    data.Link = link
+    data.FolderName = folder_suggested.Name
   }
-
   writeJson(w, data)
 }
 
 
-func (r mgoRepo) Create(link *Link) (err error) {
-  if link.Id.Hex() == "" {
-    link.Id = bson.NewObjectId()
-  }
-  //if link.Created.IsZero() {
-  //  link.Created = time.Now()
-  //}
-  //link.Updated = time.Now()
-  _, err = r.Collection.UpsertId(link.Id, link)
-  return
-}
-
-
-func handleLinks(w http.ResponseWriter, r *http.Request) {
+func handleLinkAll(w http.ResponseWriter, r *http.Request) {
   var (
     links Links
     err   error
   )
-  if links, err = linkRepo.All(); err != nil {
+  if err = linkRepo.All(&links); err != nil {
     log.Printf("%v", err)
     http.Error(w, "500 Internal Server Error", 500)
     return
   }
   writeJson(w, links)
 }
-
-func (r mgoRepo) All() (links Links, err error) {
-  err = r.Collection.Find(bson.M{}).All(&links)
-  return
-}
-
 
 
