@@ -2,11 +2,7 @@ package main
 
 import (
   "fmt"
-  "strings"
-  "sort"
-  "io/ioutil"
   "gopkg.in/mgo.v2/bson"
-  "github.com/reiver/go-porterstemmer"
 )
 
 
@@ -19,36 +15,37 @@ func (r FolderRepo) Create(folder *Folder) (err error) {
 }
 
 func (r FolderRepo) All(folders *Folders) (err error) {
-  err = r.Collection.Find(bson.M{}).All(&folders)
+  err = r.Collection.Find(bson.M{}).All(folders)
   return
 }
 
-func (r FolderRepo) SuggestFolder(folder_suggested *Folder, extra_info *string) (err error) {
-  csv_content, err := ioutil.ReadFile("stopwords.csv")
-  if err != nil { panic(err) }
+func (r FolderRepo) SuggestFolder(folder_suggested *Folder, linkRepo *LinkRepo, tags_filtered *[]string, extra_info *string) (err error) {
+  //TODO: What if there are no Links???
+  var links Links
+  var best_score int
+  var best_folder_id bson.ObjectId
 
-  stopwords := strings.Split(string(csv_content), ",")
-  tags_raw := strings.Fields(*extra_info)
-  sort.Sort(sort.StringSlice(tags_raw))
-
-  i_stopwords := 0;
-  i_tags_raw := 0;
-  i_tags_filtered := 0;
-  tags_filtered := make([]string, len(tags_raw), len(tags_raw))
-  for (i_stopwords < len(stopwords)) && (i_tags_raw < len(tags_raw)) {
-    if (tags_raw[i_tags_raw] == stopwords[i_stopwords]) {
-      i_tags_raw++
-    } else if (tags_raw[i_tags_raw] > stopwords[i_stopwords]) {
-      i_stopwords++
-    } else {
-      tags_filtered[i_tags_filtered] = porterstemmer.StemString(tags_raw[i_tags_raw])
-      i_tags_filtered++
-      i_tags_raw++
-    }
+  *tags_filtered = TagsFilter(extra_info) // remove empty strings
+  fmt.Println(tags_filtered)
+  if err = linkRepo.All(&links); err != nil {
+    panic(err)
   }
 
-  fmt.Printf("tags_filtered: %s", tags_filtered)
-  fmt.Printf("tags_raw: %s", tags_raw)
-  err = r.Collection.Find(bson.M{}).One(&folder_suggested)
+  scores := make(map[bson.ObjectId]int)
+  for _, link := range links {
+    fmt.Println("link: ",link.Name)
+    scores[link.FolderId] += TagsCommonalityScore(link.Tags, *tags_filtered)
+    fmt.Println("score: ",scores[link.FolderId])
+  }
+  fmt.Println(scores)
+  for folder_id, score := range scores {
+    if (best_score < score) {
+      best_score = score
+      best_folder_id = folder_id
+    }
+  }
+  r.Collection.Find(bson.M{"_id": best_folder_id}).One(&folder_suggested)
+  fmt.Printf("suggested folder %s\n", folder_suggested)
   return
 }
+

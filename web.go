@@ -30,13 +30,13 @@ type (
     CreatedAt time.Time `json:"created_at" bson:"created_at"`
     UpdatedAt time.Time `json:"updated_at" bsom:"created_at"`
     FolderId bson.ObjectId `json:"folder_id" bson:"folder_id"`
+    Tags []string `json:"tags" bson:"tags"`
   }
 
   Folders []Folder
   Folder struct {
     Id bson.ObjectId `json:"id" bson:"_id"`
     Name string `json:"name" bson:"name"`
-    Tags []string
   }
 )
 
@@ -78,6 +78,7 @@ func handleLinkCreate(w http.ResponseWriter, r *http.Request) {
   var link Link
   var folder_suggested Folder
   var err  error
+  var tags_filtered []string
   data := struct {
     Success bool `json:"success"`
     FolderName string `json:"folder_name"`
@@ -87,9 +88,11 @@ func handleLinkCreate(w http.ResponseWriter, r *http.Request) {
   r.ParseForm()
   link.Name = r.FormValue("name")
   link.Url = r.FormValue("url")
-  extra_info := link.Name + " " + r.FormValue("extra_info")
-  folderRepo.SuggestFolder(&folder_suggested, &extra_info)
+  info_raw := link.Name + " " + r.FormValue("extra_info")
+  folderRepo.SuggestFolder(&folder_suggested, &linkRepo, &tags_filtered, &info_raw)
   link.FolderId = folder_suggested.Id
+  link.Tags = tags_filtered
+  fmt.Println(tags_filtered)
   if err = linkRepo.Create(&link); err != nil {
     panic(err)
   } else {

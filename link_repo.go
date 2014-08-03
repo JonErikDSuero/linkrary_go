@@ -13,7 +13,7 @@ func (r LinkRepo) Create (link *Link) (err error) {
   return
 }
 
-func (r LinkRepo) All(likes *Links) (err error) {
-  err = r.Collection.Find(bson.M{}).All(&likes)
+func (r LinkRepo) All(links *Links) (err error) {
+  err = r.Collection.Find(bson.M{}).All(links)
   return
 }
