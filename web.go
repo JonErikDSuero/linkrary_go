@@ -18,7 +18,7 @@ type (
 func main() {
   var mc MgoCon
   var err error
-  mc.DB = connectToMongoDB("linkrary_go-production")
+  mc.DB = MgoCon_Connect("linkrary_go-production")
 
   r := mux.NewRouter()
   r.HandleFunc("/", Handle_Home(mc)).Methods("GET")
@@ -34,7 +34,7 @@ func main() {
 }
 
 
-func connectToMongoDB(db_name string) (db *mgo.Database) {
+func MgoCon_Connect(db_name string) (db *mgo.Database) {
   var mongo_url = os.Getenv("MY_MONGOmc.DB.URL")
   if (mongo_url == "") {
     mongo_url = "localhost:27017"
