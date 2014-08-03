@@ -1,7 +1,6 @@
 package main
 
 import (
-  "fmt"
   "strings"
   "regexp"
   "sort"
@@ -10,7 +9,7 @@ import (
 )
 
 
-func TagsFilter(info_raw *string) (tags_filtered []string) {
+func Tag_Filter(info_raw *string) (tags_filtered []string) {
   var stem string
   csv_content, err := ioutil.ReadFile("stopwords.csv")
   if (err != nil) { panic(err) }
@@ -23,13 +22,14 @@ func TagsFilter(info_raw *string) (tags_filtered []string) {
   i_stopwords := 0
   i_tags_raw := 0
   i_tags_filtered_map := 1 // shift by 1 to stop comparing index by 0 (*A)
+
   for (i_stopwords < len(stopwords)) && (i_tags_raw < len(tags_raw)) {
     if (tags_raw[i_tags_raw] == stopwords[i_stopwords]) {
       i_tags_raw++
     } else if (tags_raw[i_tags_raw] > stopwords[i_stopwords]) {
       i_stopwords++
     } else {
-      stem = TagStemmed(tags_raw[i_tags_raw])
+      stem = Tag_Stemmed(tags_raw[i_tags_raw])
       if (tags_filtered_map[stem] == 0) && (tags_raw[i_tags_raw] != "") {
         tags_filtered_map[stem] = i_tags_filtered_map
         i_tags_filtered_map++
@@ -38,7 +38,7 @@ func TagsFilter(info_raw *string) (tags_filtered []string) {
     }
   }
   for (i_tags_raw < len(tags_raw)) { // get the remaining tags
-    stem = tags_raw[i_tags_raw]
+    stem = Tag_Stemmed(tags_raw[i_tags_raw])
     if (tags_filtered_map[stem] == 0) && (tags_raw[i_tags_raw] != "") {
       tags_filtered_map[stem] = i_tags_filtered_map
       i_tags_filtered_map++
@@ -50,12 +50,11 @@ func TagsFilter(info_raw *string) (tags_filtered []string) {
   for tag, index := range tags_filtered_map {
     tags_filtered[index-1] = tag // remove the shift of 1 (*A)
   }
-  fmt.Println("ending: ", tags_filtered)
   return tags_filtered
 }
 
 
-func TagsCommonalityScore (tags_a []string, tags_b []string) (score int) {
+func Tag_CommonalityScore (tags_a []string, tags_b []string) (score int) {
   score = 0
   i_tags_a := 0
   i_tags_b := 0
@@ -70,12 +69,11 @@ func TagsCommonalityScore (tags_a []string, tags_b []string) (score int) {
       i_tags_b++
     }
   }
-  fmt.Println("tag_score: ",score, tags_a, tags_b)
   return score
 }
 
 
-func TagStemmed (tag_raw string) (tag_stemmed string) {
+func Tag_Stemmed (tag_raw string) (tag_stemmed string) {
   regexp_lowercase, err := regexp.Compile("[^a-z]")
   if err != nil { panic(err) }
   tag_stemmed = regexp_lowercase.ReplaceAllString(strings.ToLower( tag_raw ), "")

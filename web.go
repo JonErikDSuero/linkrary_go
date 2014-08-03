@@ -1,64 +1,29 @@
 package main
 
-
 import (
   "os"
   "fmt"
   "net/http"
   "github.com/gorilla/mux"
   "gopkg.in/mgo.v2"
-  //"strings"
-  "gopkg.in/mgo.v2/bson"
-  "log"
-  "time"
 )
 
 type (
-  LinkRepo struct {
-    Collection *mgo.Collection
-  }
-
-  FolderRepo struct {
-    Collection *mgo.Collection
-  }
-
-  Links []Link
-  Link struct {
-    Id bson.ObjectId `json:"id" bson:"_id"`
-    Name string `json:"name" bson:"name"`
-    Url string `json:"url" bson:"url"`
-    CreatedAt time.Time `json:"created_at" bson:"created_at"`
-    UpdatedAt time.Time `json:"updated_at" bsom:"created_at"`
-    FolderId bson.ObjectId `json:"folder_id" bson:"folder_id"`
-    Tags []string `json:"tags" bson:"tags"`
-  }
-
-  Folders []Folder
-  Folder struct {
-    Id bson.ObjectId `json:"id" bson:"_id"`
-    Name string `json:"name" bson:"name"`
+  MgoCon struct {
+    DB *mgo.Database
   }
 )
 
-var linkRepo LinkRepo
-var folderRepo FolderRepo
 
 func main() {
-  var mongo_url = os.Getenv("MY_MONGODB_URL")
-  if (mongo_url == "") {
-    mongo_url = "localhost:27017"
-  }
-  session, err := mgo.Dial(mongo_url)
-  if err != nil { panic(err) }
-  defer session.Close()
-  session.SetMode(mgo.Monotonic, true)  // Optional. Switch the session to a monotonic behavior.
-  linkRepo.Collection = session.DB("linkrary_go-production").C("link")
-  folderRepo.Collection = session.DB("linkrary_go-production").C("folder")
+  var mc MgoCon
+  var err error
+  mc.DB = connectToMongoDB("linkrary_go-production")
 
   r := mux.NewRouter()
-  r.HandleFunc("/", handleHome).Methods("GET")
-  r.HandleFunc("/links", handleLinkAll).Methods("GET")
-  r.HandleFunc("/links/create", handleLinkCreate).Methods("POST")
+  r.HandleFunc("/", Handle_Home(mc)).Methods("GET")
+  r.HandleFunc("/links", Handle_LinkAll(mc)).Methods("GET")
+  r.HandleFunc("/links/create", Handle_LinkCreate(mc)).Methods("POST")
   http.Handle("/", r)
   var port = os.Getenv("PORT")
   if (port == "") {
@@ -69,51 +34,71 @@ func main() {
 }
 
 
-func handleHome(w http.ResponseWriter, r *http.Request) {
-  fmt.Fprintf(w, "Hello!")
+func connectToMongoDB(db_name string) (db *mgo.Database) {
+  var mongo_url = os.Getenv("MY_MONGOmc.DB.URL")
+  if (mongo_url == "") {
+    mongo_url = "localhost:27017"
+  }
+  session, err := mgo.Dial(mongo_url)
+  if err != nil { panic(err) }
+  session.SetMode(mgo.Monotonic, true)  // Optional. Switch the session to a monotonic behavior.
+  db = session.DB(db_name)
+  return db
 }
 
 
-func handleLinkCreate(w http.ResponseWriter, r *http.Request) {
-  var link Link
-  var folder_suggested Folder
-  var err  error
-  var tags_filtered []string
-  data := struct {
-    Success bool `json:"success"`
-    FolderName string `json:"folder_name"`
-  }{
-    Success: false,
+func Handle_Home(mc MgoCon) (func(http.ResponseWriter, *http.Request)) {
+  return func(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Hello!")
   }
-  r.ParseForm()
-  link.Name = r.FormValue("name")
-  link.Url = r.FormValue("url")
-  info_raw := link.Name + " " + r.FormValue("extra_info")
-  folderRepo.SuggestFolder(&folder_suggested, &linkRepo, &tags_filtered, &info_raw)
-  link.FolderId = folder_suggested.Id
-  link.Tags = tags_filtered
-  fmt.Println(tags_filtered)
-  if err = linkRepo.Create(&link); err != nil {
-    panic(err)
-  } else {
-    data.Success = true
-    data.FolderName = folder_suggested.Name
-  }
-  writeJson(w, data)
 }
 
 
-func handleLinkAll(w http.ResponseWriter, r *http.Request) {
-  var (
-    links Links
-    err   error
-  )
-  if err = linkRepo.All(&links); err != nil {
-    log.Printf("%v", err)
-    http.Error(w, "500 Internal Server Error", 500)
-    return
+func Handle_LinkAll(mc MgoCon) (func(http.ResponseWriter, *http.Request)) {
+  return func(w http.ResponseWriter, r *http.Request) {
+    var (
+      links Links
+      err   error
+    )
+    if err = mc.Link_All(&links); err != nil {
+      panic(err)
+    }
+    writeJson(w, links)
   }
-  writeJson(w, links)
 }
 
 
+func Handle_LinkCreate(mc MgoCon) (func(http.ResponseWriter, *http.Request)) {
+  return func(w http.ResponseWriter, r *http.Request) {
+    var link Link
+    var folder_suggested Folder
+    var err  error
+    var tags_filtered []string
+    data := struct {
+      Success bool `json:"success"`
+      FolderName string `json:"folder_name"`
+    }{
+      Success: false,
+    }
+
+    r.ParseForm()
+    info_raw := r.FormValue("name") + " " + r.FormValue("extra_info")
+
+    if err = mc.Folder_Suggest(&folder_suggested, &tags_filtered, &info_raw); err != nil {
+      panic(err)
+    }
+
+    link.Name = r.FormValue("name")
+    link.Url = r.FormValue("url")
+    link.FolderId = folder_suggested.Id
+    link.Tags = tags_filtered
+
+    if err = mc.Link_Create(&link); err != nil {
+      panic(err)
+    } else {
+      data.Success = true
+      data.FolderName = folder_suggested.Name
+    }
+    writeJson(w, data)
+  }
+}
