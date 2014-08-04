@@ -1,8 +1,8 @@
 package main
 
 import (
-  "gopkg.in/mgo.v2/bson"
   "time"
+  "gopkg.in/mgo.v2/bson"
 )
 
 type (
@@ -19,7 +19,7 @@ type (
 )
 
 
-func (mc MgoCon) Link_Create (link *Link) (err error) {
+func (mc MgoCon) Link_Upsert(link *Link) (err error) {
   if link.Id.Hex() == "" {
     link.Id = bson.NewObjectId()
   }
@@ -31,4 +31,10 @@ func (mc MgoCon) Link_Create (link *Link) (err error) {
 func (mc MgoCon) Link_All(links *Links) (err error) {
   err = mc.DB.C("link").Find(bson.M{}).All(links)
   return
+}
+
+
+func (mc MgoCon) Link_Find(link *Link, query interface{}) (err error) {
+  err = mc.DB.C("link").Find(query).One(&link)
+  return err
 }

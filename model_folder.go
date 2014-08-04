@@ -13,7 +13,7 @@ type (
 )
 
 
-func (mc MgoCon) Folder_Create(folder *Folder) (err error) {
+func (mc MgoCon) Folder_Upsert(folder *Folder) (err error) {
   if folder.Id.Hex() == "" {
     folder.Id = bson.NewObjectId()
   }
@@ -28,10 +28,15 @@ func (mc MgoCon) Folder_All(folders *Folders) (err error) {
 }
 
 
+func (mc MgoCon) Folder_Find(folder *Folder, query interface{}) (err error) {
+  err = mc.DB.C("folder").Find(query).One(&folder)
+  return
+}
+
 func (mc MgoCon) Folder_Suggest(folder_suggested *Folder, tags_filtered *[]string, extra_info *string) (err error) {
   var links Links
-  var best_score int
   var best_folder_id bson.ObjectId
+  best_score := -1 // if all scores are 0's, the first folder will be default
 
   *tags_filtered = Tag_Filter(extra_info) // remove empty strings
 
@@ -50,7 +55,6 @@ func (mc MgoCon) Folder_Suggest(folder_suggested *Folder, tags_filtered *[]strin
       best_folder_id = folder_id
     }
   }
-
-  mc.DB.C("folder").Find(bson.M{"_id": best_folder_id}).One(&folder_suggested)
+  mc.DB.C("folder").Find(bson.M{"_id": best_folder_id}).One(folder_suggested)
   return err
 }

@@ -6,6 +6,7 @@ import (
   "net/http"
   "github.com/gorilla/mux"
   "gopkg.in/mgo.v2"
+  "gopkg.in/mgo.v2/bson"
 )
 
 type (
@@ -24,6 +25,7 @@ func main() {
   r.HandleFunc("/", Handle_Home(mc)).Methods("GET")
   r.HandleFunc("/links", Handle_LinkAll(mc)).Methods("GET")
   r.HandleFunc("/links/create", Handle_LinkCreate(mc)).Methods("POST")
+  r.HandleFunc("/links/change_folder", Handle_LinkChangeFolder(mc)).Methods("POST")
   http.Handle("/", r)
   var port = os.Getenv("PORT")
   if (port == "") {
@@ -70,16 +72,17 @@ func Handle_LinkAll(mc MgoCon) (func(http.ResponseWriter, *http.Request)) {
 
 func Handle_LinkCreate(mc MgoCon) (func(http.ResponseWriter, *http.Request)) {
   return func(w http.ResponseWriter, r *http.Request) {
-    var link Link
-    var folder_suggested Folder
-    var err  error
-    var tags_filtered []string
     data := struct {
       Success bool `json:"success"`
       FolderName string `json:"folder_name"`
     }{
       Success: false,
     }
+
+    var link Link
+    var folder_suggested Folder
+    var err  error
+    var tags_filtered []string
 
     r.ParseForm()
     info_raw := r.FormValue("name") + " " + r.FormValue("extra_info")
@@ -93,11 +96,42 @@ func Handle_LinkCreate(mc MgoCon) (func(http.ResponseWriter, *http.Request)) {
     link.FolderId = folder_suggested.Id
     link.Tags = tags_filtered
 
-    if err = mc.Link_Create(&link); err != nil {
+    if err = mc.Link_Upsert(&link); err != nil {
       panic(err)
     } else {
       data.Success = true
       data.FolderName = folder_suggested.Name
+    }
+    writeJson(w, data)
+  }
+}
+
+
+func Handle_LinkChangeFolder(mc MgoCon) (func(http.ResponseWriter, *http.Request)) {
+  return func(w http.ResponseWriter, r *http.Request) {
+    data := struct {
+      Success bool `json:"success"`
+    }{
+      Success: false,
+    }
+
+    var link Link
+    var folder Folder
+    var err error
+
+    r.ParseForm()
+    if err = mc.Link_Find(&link, bson.M{"url": r.FormValue("url")}); err != nil {
+      panic(err)
+    }
+    if err = mc.Folder_Find(&folder, bson.M{"name": r.FormValue("folder_name")}); err != nil {
+      panic(err)
+    }
+    link.FolderId = folder.Id
+
+    if err = mc.Link_Upsert(&link); err != nil {
+      panic(err)
+    } else {
+      data.Success = true
     }
     writeJson(w, data)
   }
