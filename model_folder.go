@@ -1,6 +1,7 @@
 package main
 
 import (
+  "time"
   "gopkg.in/mgo.v2/bson"
 )
 
@@ -9,6 +10,7 @@ type (
   Folder struct {
     Id bson.ObjectId `json:"id" bson:"_id"`
     Name string `json:"name" bson:"name"`
+    UpdatedAt time.Time `json:"updated_at" bsom:"created_at"`
   }
 )
 
@@ -17,6 +19,7 @@ func (mc MgoCon) Folder_Upsert(folder *Folder) (err error) {
   if folder.Id.Hex() == "" {
     folder.Id = bson.NewObjectId()
   }
+  folder.UpdatedAt = time.Now()
   _, err = mc.DB.C("folder").UpsertId(folder.Id, folder)
   return
 }
