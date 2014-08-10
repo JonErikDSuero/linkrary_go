@@ -33,8 +33,8 @@ func Tag_Filter(info_raw *string) (tags_filtered []string) {
       if (tags_filtered_map[stem] == 0) && (tags_raw[i_tags_raw] != "") {
         tags_filtered_map[stem] = i_tags_filtered_map
         i_tags_filtered_map++
-        i_tags_raw++
       }
+      i_tags_raw++
     }
   }
   for (i_tags_raw < len(tags_raw)) { // get the remaining tags
@@ -42,8 +42,8 @@ func Tag_Filter(info_raw *string) (tags_filtered []string) {
     if (tags_filtered_map[stem] == 0) && (tags_raw[i_tags_raw] != "") {
       tags_filtered_map[stem] = i_tags_filtered_map
       i_tags_filtered_map++
-      i_tags_raw++
     }
+    i_tags_raw++
   }
 
   tags_filtered = make([]string, len(tags_filtered_map), len(tags_filtered_map))
