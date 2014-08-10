@@ -37,6 +37,7 @@ func (mc MgoCon) Folder_Find(folder *Folder, query interface{}) (err error) {
 }
 
 func (mc MgoCon) Folder_Suggest(folder_suggested *Folder, tags_filtered *[]string, extra_info *string) (err error) {
+  //TODO: what if there are no links at all?
   var links Links
   var best_folder_id bson.ObjectId
   best_score := -1 // if all scores are 0's, the first folder will be default
