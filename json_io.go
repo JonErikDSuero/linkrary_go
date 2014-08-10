@@ -34,6 +34,7 @@ func writeJson(w http.ResponseWriter, v interface{}) {
   if data, err := json.Marshal(doc); err != nil {
     log.Printf("Error marshalling json: %v", err)
   } else {
+    w.Header().Set("Access-Control-Allow-Origin", "*")
     w.Header().Set("Content-Length", strconv.Itoa(len(data)))
     w.Header().Set("Content-Type", "application/json")
     w.Write(data)
